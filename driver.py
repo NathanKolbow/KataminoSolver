@@ -78,7 +78,7 @@ def solve(board=None, pieces=0):
             if board[y][x] != 0:
                 continue
 
-            piv_range = range(8)
+            pivs = [0, 1, 2, 3, 4, 5, 6, 7]
 
             # Change the pivot range to get rid of repeats
             # Fully symmetric and rotation invariant piece: range(1)
@@ -86,50 +86,61 @@ def solve(board=None, pieces=0):
             # Symmetric about both axes: range(2) (skip reflections and all but one rotation)
             # Flip symmetry after 180º: [0, 1, 4, 5]
             if new_piece == 3:
-                piv_range = range(4)
+                pivs = [0, 1, 2, 3]
             elif new_piece == 7:
-                piv_range = range(2)
+                pivs = [0, 1]
             elif new_piece == 9:
-                piv_range = range(4)
+                pivs = [0, 1, 2, 3]
             elif new_piece == 10:
-                piv_range = [0, 1, 4, 5]
+                pivs = [0, 1, 4, 5]
             elif new_piece == 11:
-                piv_range = range(1)
+                pivs = [0]
             elif new_piece == 12:
-                piv_range = range(4)
+                pivs = [0, 1, 2, 3]
+            
+            # Convert to NumPy array so that we can index w/ truth arrays
+            pivs = np.array(pivs, dtype=int)    
+            
+            ## Let's eliminate all invalid pivots at once.
+            valid_piv = np.array([True for i in pivs], dtype=bool)
+            all_offsets = np.array([_get_offsets(new_piece, piv) for piv in pivs])
 
-            for piv in piv_range:
+            # Cycle through and try each VALID pivot
+            for i in range(valid_piv.shape[0]):
+                # If this piv has already been invalidated: move on
+                if not valid_piv[i]:
+                    continue
+
                 new_board = np.copy(board)
 
                 # Grab the offsets that the new peice will fill
-                new_piece_filled_offsets = _get_offsets(new_piece, piv)
-
-                # Check if any of the offsets will be invalid
-                if y + new_piece_filled_offsets[:, 1].max() >= 5:
-                    continue
-                elif x + new_piece_filled_offsets[:, 0].max() >= BOARD_WIDTH:
-                    continue
+                # new_piece_filled_offsets = _get_offsets(new_piece, piv)
+                offsets = all_offsets[i]
 
                 # Go through each space we will fill and check if it
                 # is already taken; if it is, skip this step, else
                 # continue
-                valid = True
-                for offset in new_piece_filled_offsets:
-                    # # If this offset & pivot goes off the board, it is not valid
-                    # if y+offset[1] < 0 or y+offset[1] >= 5 or x+offset[0] < 0 or x+offset[0] >= BOARD_WIDTH:
-                    #     valid = False
-                    #     continue
-                    
-                    # # Check if the placement is valid or not
-                    if new_board[y+offset[1]][x+offset[0]] != 0:
-                        valid = False
+                for offset in offsets:
+                    # If this offset & pivot goes off the board, it is not valid
+                    if y+offset[1] < 0 or y+offset[1] >= 5 or x+offset[0] < 0 or x+offset[0] >= BOARD_WIDTH \
+                       or new_board[y+offset[1]][x+offset[0]] != 0:
+                        valid_piv[i] = False
+                        
+                        for _offset_group in np.array(range(i, pivs.shape[0]))[valid_piv[i:]]:
+                            if (offset == all_offsets[_offset_group]).all(-1).any():
+                                valid_piv[_offset_group] = False
                         break
-                    # else:
-                    new_board[y+offset[1]][x+offset[0]] = new_piece
                 
-                # Skip ahead if the choice of (x, y) and piv are not valid
-                if not valid:
+                # If this piv was invalidated: move on.
+                if not valid_piv[i]:
                     continue
+
+                # If we got here, then these offsets are valid
+                new_board[y+offsets[:,1], x+offsets[:,0]] = new_piece
+                
+                # # Skip ahead if the choice of (x, y) and piv are not valid
+                # if not valid:
+                #     continue
 
                 # If we have used all of our pieces, that means that this is a
                 # valid solution; return the board. Otherwise, we have not yet
@@ -149,6 +160,16 @@ def solve(board=None, pieces=0):
     # that contains no solutions
     return None
                 
+
+def display_piv(piece_number, piv):
+    """Prints out the given piece in the given pivot position
+
+    Args:
+        piece_number (int): the piece number
+        piv (int): the pivot of the piece
+    """
+    sys.exit(-1)
+
 
 def is_invalid(board):
     """Checks whether a board is guaranteed to be invalid at its given stage
